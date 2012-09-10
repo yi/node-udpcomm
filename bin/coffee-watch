@@ -1,0 +1,5 @@
+#!/bin/bash
+
+ulimit -n 10240
+mkdir -p lib/
+coffee -o lib/ -cw src/
