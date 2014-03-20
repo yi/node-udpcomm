@@ -20,7 +20,7 @@ class UDPShoutor
 
     if not onMsgCallback? and _.isFunction(@host)
       onMsgCallback = @host
-      @host = "localhost"
+      @host = "127.0.0.1"
 
     assert(@host?, "missing host")
     assert(_.isFunction(onMsgCallback), "missing callback")
@@ -28,6 +28,10 @@ class UDPShoutor
     @client = dgram.createSocket("udp4")
 
     @client.on 'message', onMsgCallback
+    #@client.on 'message', (msg, rinfo)->
+      #debuglog "[on message] msg.length:#{message.length}, rinfo:%j", rinfo
+      #onMsgCallback(msg, rinfo)
+      #return
 
     # 4: uint - sgf signature, 4: uint- channel id, 1: byte: msg type, 2:short - body pay load
     @bufSignature = new Buffer(11)
@@ -42,7 +46,7 @@ class UDPShoutor
     #console.log "[(#{this.channelId})sendMessage] buf:#{buf.toString('hex')}"
     return unless Buffer.isBuffer(buf) and buf.length > 0
     buf = Buffer.concat([@bufSignature, buf])
-    debuglog "[sendMessage] to: #{@host:@communicationPort}, msg length:#{buf.length}"
+    debuglog "[sendMessage] to: #{@host}:#{@communicationPort}, msg length:#{buf.length}"
     @client.send(buf, 0, buf.length, @communicationPort , @host)
 
 

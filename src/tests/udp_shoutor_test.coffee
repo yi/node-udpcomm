@@ -1,11 +1,13 @@
 {UDPShoutor} = require "../udpcomm"
 
-channelId = (4 * Math.random() >> 0) + 1
+PORT = 9999
+
+channelId = 5
 
 onMessage =  (msg, rinfo)->
   console.log "[client(#{process.pid})] msg:#{msg.toString()}, from:#{rinfo.address}:#{rinfo.port}"
 
-shoutor = new UDPShoutor(9999, channelId , onMessage )
+shoutor = new UDPShoutor(PORT, channelId , onMessage )
 
 setInterval(()->
   message = new Buffer("channelId:#{channelId} pid:#{process.pid}, time:#{Date.now()}")

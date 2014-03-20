@@ -1,6 +1,6 @@
 {
   "name": "udpcomm",
-  "description": "Provide a simple upd communication mechanism for NodeJS",
+  "description": "Provide a simple hub-like UPD datagram communication mechanism for NodeJs",
   "version": "0.1.1",
   "homepage": "https://github.com/yi/node-udpcomm",
   "author": {
@@ -26,6 +26,7 @@
     "node": ">= 0.8.0"
   },
   "scripts": {
+    "watch": "coffee -o ./lib/ -cw ./src/",
     "test": "mocha tests"
   },
   "dependencies": {

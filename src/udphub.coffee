@@ -3,9 +3,6 @@ debuglog = require("debug")("udpcomm::UDPHub")
 
 LAZY_TIMEOUT = 10000
 
-ALLOW_HOST1 = "127.0.0.1"
-ALLOW_HOST2 = "localhost"
-
 # 用于二进制流消息验证的签名值
 SIGNATURE = 6258000
 
@@ -15,7 +12,7 @@ class UDPHub
 
   # constructor function
   # @param {uint} listenToPort, port to start this service
-  constructor:(@listenToPort) ->
+  constructor:(@listenToPort, @host="127.0.0.1") ->
     @server = dgram.createSocket("udp4")
 
     # key: client port, value: update at
@@ -30,15 +27,18 @@ class UDPHub
     @server.on "message", (buf, rinfo) =>
       port = rinfo.port
       ip = rinfo.address
-      #console.log("[UDPHub(#{this.listenToPort})::onMessage]server, from:#{ip}:#{port}, got:#{buf.toString('hex')}")
+      #debuglog("[UDPHub(#{this.listenToPort})::onMessage]server, from:#{ip}:#{port}, got:#{buf.toString('hex')}")
+
       # validate sende's host
-      unless ip is ALLOW_HOST1 or ip is ALLOW_HOST2
+      unless ip is @host
         return console.error "[UDPHub(#{this.listenToPort})::onMessage] ignore msg from outside server #{ip} "
+
       # validate buf content
       if not Buffer.isBuffer(buf) or buf.length <=  SGF_UDP_HEAD_LENGTH or buf.readUInt32BE(0) isnt SIGNATURE
         return console.warn "[UDPHub(#{this.listenToPort})::onMessage] invalid buf:#{buf}"
 
       channelId =  buf.readUInt32BE(4)
+      #debuglog("[UDPHub(#{this.listenToPort})::onMessage] channelId:#{channelId}")
       this.clientPorts[port] = Date.now()
       this.clientChannelId[port] = channelId
 
@@ -54,7 +54,8 @@ class UDPHub
 
   # start this udp hub service
   start : ->
-    this.server.bind(this.listenToPort)
+    debuglog "[start] #{@host}:#{@listenToPort}"
+    @server.bind(@listenToPort, @host)
     return
 
   # stop this udp hub service
@@ -64,8 +65,7 @@ class UDPHub
 
   # broadcast message
   broadcast : (buf, channelId, ignorePort) ->
-    debuglog "[broadcast] ignorePort:#{ignorePort}, buf.length:#{buf.length}"
-
+    #debuglog "[broadcast] ignorePort:#{ignorePort}, buf.length:#{buf.length}"
     ignorePort = ignorePort.toString()
 
     @deadPorts.length = 0
@@ -80,7 +80,7 @@ class UDPHub
         #console.log "[UDPHub::broadcast] dead client:#{port}"
         @deadPorts.push(port)
       else if @clientChannelId[port] is channelId
-        #console.log "[UDPHub::broadcast] from #{ignorePort} to 127.0.0.1:#{port}"
+        debuglog "[broadcast] from:#{ignorePort} to:#{port} buf.length:#{buf.length}"
         @server.send(buf, SGF_UDP_HEAD_LENGTH, buf.length - SGF_UDP_HEAD_LENGTH, port, "127.0.0.1")
 
     for port in @deadPorts
