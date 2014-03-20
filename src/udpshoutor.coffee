@@ -1,31 +1,39 @@
-dgram = require('dgram')
+dgram = require 'dgram'
+assert = require 'assert'
+_ = require 'underscore'
+debuglog = require("debug")("udpcomm::UDPShoutor")
 
 # 用于二进制流消息验证的签名值
-SGF_SIGNATURE = 6258000
+SIGNATURE = 6258000
 
 class UDPShoutor
 
   # constructor function
   # @param {uint} communicationPort, the udp port number of hub service
   # @param {uint} channelId, an integer indicate shoutor's channel id
+  # @param {String} host, Destination hostname or IP address
   # @param {onMsgCallback} an callback function when recive channel message from the hub
-  constructor:(communicationPort, channelId, onMsgCallback) ->
-    #console.log "[UDPShoutor] communicationPort:#{communicationPort}, channelId:#{channelId}, onMsgCallback:#{onMsgCallback}"
-    throw new Error "invalid argumens" unless communicationPort > 1024 and channelId >= 0 and onMsgCallback?
+  constructor:(@communicationPort, @channelId, @host, onMsgCallback) ->
 
-    this.communicationPort = communicationPort
+    assert(@communicationPort > 1024, "communicationPort must larger then 1024")
+    assert(@channelId >= 0, "invalid channelId")
 
-    this.channelId = channelId
+    if not onMsgCallback? and _.isFunction(@host)
+      onMsgCallback = @host
+      @host = "localhost"
 
-    this.client = dgram.createSocket("udp4")
+    assert(@host?, "missing host")
+    assert(_.isFunction(onMsgCallback), "missing callback")
 
-    this.client.on 'message', onMsgCallback
+    @client = dgram.createSocket("udp4")
+
+    @client.on 'message', onMsgCallback
 
     # 4: uint - sgf signature, 4: uint- channel id, 1: byte: msg type, 2:short - body pay load
-    this.bufSignature = new Buffer(11)
-    this.bufSignature.fill(0)
-    this.bufSignature.writeUInt32BE(SGF_SIGNATURE, 0)
-    this.bufSignature.writeUInt32BE(channelId, 4)
+    @bufSignature = new Buffer(11)
+    @bufSignature.fill(0)
+    @bufSignature.writeUInt32BE(SIGNATURE, 0)
+    @bufSignature.writeUInt32BE(channelId, 4)
     #console.log "[UDPShoutor] this.bufSignature:#{this.bufSignature.toString('hex')}"
 
   # send buffer message to udp hub service
@@ -33,9 +41,9 @@ class UDPShoutor
   sendMessage : (buf) ->
     #console.log "[(#{this.channelId})sendMessage] buf:#{buf.toString('hex')}"
     return unless Buffer.isBuffer(buf) and buf.length > 0
-    buf = Buffer.concat([this.bufSignature, buf])
-    #console.log "[sendMessage] after buf:#{buf.toString('hex')}"
-    this.client.send(buf, 0, buf.length, this.communicationPort , "localhost")
+    buf = Buffer.concat([@bufSignature, buf])
+    debuglog "[sendMessage] to: #{@host:@communicationPort}, msg length:#{buf.length}"
+    @client.send(buf, 0, buf.length, @communicationPort , @host)
 
 
 module.exports = UDPShoutor

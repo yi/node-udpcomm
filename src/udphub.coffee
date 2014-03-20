@@ -1,4 +1,5 @@
 dgram = require("dgram")
+debuglog = require("debug")("udpcomm::UDPHub")
 
 LAZY_TIMEOUT = 10000
 
@@ -6,7 +7,7 @@ ALLOW_HOST1 = "127.0.0.1"
 ALLOW_HOST2 = "localhost"
 
 # 用于二进制流消息验证的签名值
-SGF_SIGNATURE = 6258000
+SIGNATURE = 6258000
 
 SGF_UDP_HEAD_LENGTH = 11
 
@@ -14,21 +15,19 @@ class UDPHub
 
   # constructor function
   # @param {uint} listenToPort, port to start this service
-  constructor:(listenToPort) ->
-    this.server = dgram.createSocket("udp4")
+  constructor:(@listenToPort) ->
+    @server = dgram.createSocket("udp4")
 
     # key: client port, value: update at
-    this.clientPorts = {}
+    @clientPorts = {}
 
     # key: channel Id, value: channel id
-    this.clientChannelId = {}
+    @clientChannelId = {}
 
-    this.deadPorts = []
-
-    this.listenToPort = listenToPort
+    @deadPorts = []
 
     # handle message received from clients
-    this.server.on("message", (buf, rinfo) =>
+    @server.on "message", (buf, rinfo) =>
       port = rinfo.port
       ip = rinfo.address
       #console.log("[UDPHub(#{this.listenToPort})::onMessage]server, from:#{ip}:#{port}, got:#{buf.toString('hex')}")
@@ -36,7 +35,7 @@ class UDPHub
       unless ip is ALLOW_HOST1 or ip is ALLOW_HOST2
         return console.error "[UDPHub(#{this.listenToPort})::onMessage] ignore msg from outside server #{ip} "
       # validate buf content
-      if not Buffer.isBuffer(buf) or buf.length <=  SGF_UDP_HEAD_LENGTH or buf.readUInt32BE(0) isnt SGF_SIGNATURE
+      if not Buffer.isBuffer(buf) or buf.length <=  SGF_UDP_HEAD_LENGTH or buf.readUInt32BE(0) isnt SIGNATURE
         return console.warn "[UDPHub(#{this.listenToPort})::onMessage] invalid buf:#{buf}"
 
       channelId =  buf.readUInt32BE(4)
@@ -45,12 +44,11 @@ class UDPHub
 
       this.broadcast(buf, channelId, port)
       return
-    )
 
-    this.server.on("listening", () =>
+    @server.on "listening", () =>
       address = this.server.address()
-      console.info("[udphub::listening] listening #{address.address}:#{address.port}")
-    )
+      debuglog("[on listening] listening #{address.address}:#{address.port}")
+      return
 
     return
 
@@ -66,31 +64,29 @@ class UDPHub
 
   # broadcast message
   broadcast : (buf, channelId, ignorePort) ->
-    console.log "[broadcast] ignorePort:#{ignorePort}, buf.length:#{buf.length}"
+    debuglog "[broadcast] ignorePort:#{ignorePort}, buf.length:#{buf.length}"
 
     ignorePort = ignorePort.toString()
 
-    this.deadPorts.splice(0, this.deadPorts.length) if this.deadPorts.length > 0
+    @deadPorts.length = 0
+    #@deadPorts.splice(0, @deadPorts.length) if @deadPorts.length > 0
 
     # all timestamp < aliveLine ports are dead ports
     aliveLine = Date.now() - LAZY_TIMEOUT
 
-    for port, timestamp of this.clientPorts
+    for port, timestamp of @clientPorts
       continue unless port isnt ignorePort
       if(timestamp < aliveLine)
         #console.log "[UDPHub::broadcast] dead client:#{port}"
-        this.deadPorts.push(port)
-      else if this.clientChannelId[port] is channelId
+        @deadPorts.push(port)
+      else if @clientChannelId[port] is channelId
         #console.log "[UDPHub::broadcast] from #{ignorePort} to 127.0.0.1:#{port}"
-        this.server.send(buf, SGF_UDP_HEAD_LENGTH, buf.length - SGF_UDP_HEAD_LENGTH, port, "127.0.0.1")
+        @server.send(buf, SGF_UDP_HEAD_LENGTH, buf.length - SGF_UDP_HEAD_LENGTH, port, "127.0.0.1")
 
-    for port in this.deadPorts
-      delete this.clientPorts[port]
-      delete this.clientChannelId[port]
+    for port in @deadPorts
+      delete @clientPorts[port]
+      delete @clientChannelId[port]
 
-    #console.log "[broadcast] clients:"
-    #console.dir this.clientPorts
-    #console.dir this.clientChannelId
     return
 
 module.exports = UDPHub
