@@ -75,7 +75,11 @@ class UDPHub
     aliveLine = Date.now() - LAZY_TIMEOUT
 
     for port, timestamp of @clientPorts
-      continue unless port isnt ignorePort
+      # FIXME:
+      # for some reason, different process send udp package via same port
+      # ty 2014-03-21
+
+      #continue unless port isnt ignorePort
       if(timestamp < aliveLine)
         #console.log "[UDPHub::broadcast] dead client:#{port}"
         @deadPorts.push(port)
